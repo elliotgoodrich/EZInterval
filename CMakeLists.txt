@@ -1,0 +1,8 @@
+cmake_minimum_required (VERSION 2.6)
+project(ezrange)
+set(ezrange_VERSION_MAJOR 0)
+set(ezrange_VERSION_MINOR 1)
+add_subdirectory(include)
+add_subdirectory(tests)
+enable_testing()
+add_test(NAME unit_tests COMMAND unit_tests)

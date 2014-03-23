@@ -30,9 +30,9 @@
 #ifndef INCLUDE_GUARD_97581AFD_D7FC_4A4A_9DAD_D0C5E1A7111C
 #define INCLUDE_GUARD_97581AFD_D7FC_4A4A_9DAD_D0C5E1A7111C
 
-#include <algorithm>
 #include <cstddef>
 #include <iterator>
+#include <limits>
 #include <ostream>
 #include <type_traits>
 #include <stdexcept>

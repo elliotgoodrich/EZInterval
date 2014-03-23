@@ -64,7 +64,7 @@ struct sentinel_helper<true> {
 };
 
 /* Helper function to compare two numbers. */
-template<bool StrictComparison>
+template <bool StrictComparison>
 struct less_than_helper;
 
 template <>
@@ -75,7 +75,7 @@ struct less_than_helper<false> {
 	}
 };
 
-template<>
+template <>
 struct less_than_helper<true> {
 	template <typename N1, typename N2>
 	static bool f(N1 const& lhs, N2 const& rhs) {

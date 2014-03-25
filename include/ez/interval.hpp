@@ -59,7 +59,8 @@ template <>
 struct sentinel_helper<true> {
 	template <typename T>
 	static T f(T const& lowerbound, T const& upperbound, T const& step) {
-		return static_cast<std::ptrdiff_t>((upperbound - lowerbound + step) / step) * step + lowerbound;
+		return static_cast<std::ptrdiff_t>((upperbound - lowerbound + step) / step) * step
+		                                   + lowerbound;
 	}
 };
 
@@ -289,27 +290,24 @@ public:
 	, m_step{step} {
 	}
 
-	/** Create a stepped_interval in reverse. */
-	stepped_interval<T, ROpen, LOpen> reverse() const {
-		return {m_upperbound, m_lowerbound, -m_step};
-	}
-
 	const_interval_iterator<T> begin() const {
 		static_assert(!LOpen, "Cannot iterate through an interval that is left-open.");
 		return {m_lowerbound, m_step};
 	}
 
 	const_interval_iterator<T> end() const {
+		static_assert(!LOpen, "Cannot iterate backwards through an interval that is left-open.");
 		return {detail::sentinel_helper<!ROpen>::f(m_lowerbound, m_upperbound, m_step), m_step};
 	}
 
 	const_interval_iterator<T> rbegin() const {
-		static_assert(!ROpen, "Cannot iterate backwards through an interval that is right-open.");
+		static_assert(!LOpen, "Cannot iterate backwards through an interval that is left-open.");
 		return {detail::sentinel_helper<!ROpen>::f(m_lowerbound, m_upperbound, m_step) - m_step,
 		        -m_step};
 	}
 
 	const_interval_iterator<T> rend() const {
+		static_assert(!LOpen, "Cannot iterate backwards through an interval that is left-open.");
 		return {m_lowerbound - m_step, -m_step};
 	}
 
@@ -460,10 +458,6 @@ public:
 
 	const_interval_iterator<T> rend() const {
 		return step(1).rend();
-	}
-
-	stepped_interval<T, ROpen, LOpen> reverse() const {
-		return step(1).reverse();
 	}
 
 private:

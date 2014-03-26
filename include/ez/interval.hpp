@@ -102,9 +102,8 @@ struct proper_subset_helper {
 /* Helper class to determine if one interval is a proper superset of another. */
 template <bool LhsLOpen, bool LhsROpen, bool RhsLOpen, bool RhsROpen>
 struct proper_superset_helper {
-	template <typename N1, typename N2>
-
 	/* Returns true if \a N1 is a proper superset of \a N2. */
+	template <typename N1, typename N2>
 	static bool f(N1 const& lhs, N2 const& rhs) {
 		return proper_subset_helper<RhsLOpen, RhsROpen, LhsLOpen, LhsROpen>::f(rhs, lhs);
 	}
@@ -128,9 +127,8 @@ struct subset_helper {
 /* Helper class to determine if one interval is a superset of another. */
 template <bool LhsLOpen, bool LhsROpen, bool RhsLOpen, bool RhsROpen>
 struct superset_helper {
-	template <typename N1, typename N2>
-
 	/* Returns true if \a N1 is a superset of \a N2. */
+	template <typename N1, typename N2>
 	static bool f(N1 const& lhs, N2 const& rhs) {
 		return subset_helper<RhsLOpen, RhsROpen, LhsLOpen, LhsROpen>::f(rhs, lhs);
 	}

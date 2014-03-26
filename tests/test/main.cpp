@@ -287,6 +287,44 @@ BOOST_AUTO_TEST_CASE(ReverseIterations) {
 	}
 }
 
+BOOST_AUTO_TEST_CASE(ReverseIntervals) {
+	{
+		std::stringstream sstream;
+		auto numbers = ez::interval[0][9];
+		for(auto number : numbers.reverse_step(1)) {
+			sstream << number;
+		}
+		BOOST_CHECK_EQUAL(sstream.str(), "9876543210");
+	}
+
+	{
+		std::stringstream sstream;
+		auto numbers = ez::interval(1)[7];
+		for(auto number : numbers.reverse_step(1)) {
+			sstream << number;
+		}
+		BOOST_CHECK_EQUAL(sstream.str(), "765432");
+	}
+
+	{
+		std::stringstream sstream;
+		auto numbers = ez::interval[0][9];
+		for(auto number : numbers.reverse_step(3)) {
+			sstream << number;
+		}
+		BOOST_CHECK_EQUAL(sstream.str(), "9630");
+	}
+
+	{
+		std::stringstream sstream;
+		auto numbers = ez::interval[0][10];
+		for(auto number : numbers.reverse_step(3)) {
+			sstream << number;
+		}
+		BOOST_CHECK_EQUAL(sstream.str(), "10741");
+	}
+}
+
 BOOST_AUTO_TEST_CASE(Contains) {
 	auto A = ez::interval[0][2];
 	BOOST_CHECK(!A.contains(-1));

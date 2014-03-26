@@ -442,6 +442,13 @@ public:
 		return {m_lowerbound, m_upperbound, step};
 	}
 
+	/** Return a proxy object which has a begin and end function to iterate backwards. */
+	stepped_interval<T, ROpen, LOpen> reverse_step(T const& step) const {
+		static_assert(std::numeric_limits<T>::is_exact, "Unable to iterate through an interval in"
+		                                                "which the underlying type is not exact.");
+		return {m_upperbound, m_lowerbound + 2 * LOpen, -step};
+	}
+
 	const_interval_iterator<T> begin() const {
 		return step(1).begin();
 	}

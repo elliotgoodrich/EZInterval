@@ -12,7 +12,10 @@ include_directories(../include/)
 include_directories(${Boost_INCLUDE_DIRS})
 
 set(SOURCES
-	test/main.cpp
+	basic_interval.cpp
+	interval.cpp
+	direct_iterator.cpp
+	main.cpp
 )
 
 add_executable(unit_tests ${SOURCES})

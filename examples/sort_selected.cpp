@@ -33,4 +33,6 @@ int main() {
 	std::copy(numbers.cbegin(),
 	          numbers.cend(),
 	          std::ostream_iterator<int>(std::cout, " "));
+
+	std::cout << '\n';
 }

@@ -22,5 +22,5 @@ int main() {
 		}
 	}
 
-	std::cout << std::endl;
+	std::cout << '\n';
 }

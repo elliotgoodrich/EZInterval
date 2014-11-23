@@ -28,5 +28,5 @@ int main() {
 	               std::ostream_iterator<std::string>(std::cout, ", "),
 	               fizzbuzz);
 
-	std::cout << std::endl;
+	std::cout << '\n';
 }

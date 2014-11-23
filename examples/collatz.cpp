@@ -21,5 +21,5 @@ int main() {
 	               std::ostream_iterator<int>(std::cout, ", "),
 	               stopping_time);
 
-	std::cout << std::endl;
+	std::cout << '\n';
 }

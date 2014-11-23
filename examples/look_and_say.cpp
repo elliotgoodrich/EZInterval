@@ -14,7 +14,7 @@ int main() {
 	for(auto x : ez::make_interval[1][limit]) {
 		std::cout << x << ": ";
 		std::copy(std::begin(seq), std::end(seq), std::ostream_iterator<int>(std::cout));
-		std::cout << "\n";
+		std::cout << '\n';
 
 		std::vector<int> next_seq;
 		for(auto current = std::begin(seq), end = std::end(seq); current != end;) {
@@ -28,7 +28,5 @@ int main() {
 
 		seq = next_seq;
 	}
-
-	std::cout << std::endl;
 }
 

@@ -7,6 +7,7 @@
 #include <iterator>
 #include <vector>
 
+// Sort all elements in place for which p returns true, using comp for comparison
 template <typename RandomAccessIt, typename UnaryPredicate, typename Compare>
 void sort_selected(RandomAccessIt begin, RandomAccessIt end, UnaryPredicate p, Compare comp) {
 	std::vector<RandomAccessIt> positions;

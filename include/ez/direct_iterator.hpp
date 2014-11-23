@@ -37,8 +37,7 @@
 
 namespace ez {
 
-// Don't directly rely on anything in the details namespace as it is prone to change
-namespace details {
+namespace detail {
 
 // is_defined<T> is aliased as std::true_type only if T is
 template <typename>
@@ -210,35 +209,45 @@ template <typename T>
 class direct_iterator;
 
 /** This is a convenience function template that constructs an ez::direct_iterator for
-    \a value the type deduced from the type of the argument. */
+ *  \a value the type deduced from the type of the argument. */
 template <typename T>
-direct_iterator<T> make_direct_iterator(T value);
+direct_iterator<T> make_direct_iterator(T const& value);
 
 /** An iterator for a type T, that when dereferenced, will return a reference to T, rather than
-    what T dereferences to.
-
-    direct_iterator<T> can be seen as a kind of inverse to boost::indirect_iterator, which performs a
-    double dereference in operator*(). In fact, boost::indirect_iterator<ez::direct_iterator<T>>
-    should be functionally equivalent to just T, when T is itself a const_iterator.
-
-    Because direct_iterator<T> never dereferences the type T, it is possible to use direct_iterator
-    with the integer types to have an iterator to ints, chars, doubles etc.
-
-    This iterator will never return a non-const reference/pointer to the underlying object, so there
-    is not a separate const_direct_iterator as it would be identical.
-
-    direct_iterator<T>::difference_type will always be the same as T::difference_type, if it exits,
-    or to std::ptrdiff_t otherwise. Simiarly, direct_iterator<T>::iterator_category will be the same
-    as T::iterator_category, if it exists, or to the most strict iterator category that T supports
-    otherwise. */
+ *  what T dereferences to.
+ *
+ *  direct_iterator<T> can be seen as a kind of inverse to boost::indirect_iterator, which performs
+ *  a double dereference in operator*(). In fact, boost::indirect_iterator<ez::direct_iterator<T>>
+ *  should be functionally equivalent to just T, when T is itself a const_iterator.
+ *
+ *  Because direct_iterator<T> never dereferences the type T, it is possible to use direct_iterator
+ *  with the integer types to have an iterator to int, char, double etc.
+ *
+ *  This iterator will never return a non-const reference/pointer to the underlying object, so there
+ *  is not a separate const_direct_iterator as it would be identical.
+ *
+ *  direct_iterator<T>::difference_type will always be the same as T::difference_type, if it exits,
+ *  or to std::ptrdiff_t otherwise. Simiarly, direct_iterator<T>::iterator_category will be the same
+ *  as T::iterator_category, if it exists, or to the most strict iterator category that T supports
+ *  otherwise.
+ *
+ *  \code
+ *  auto it = ez::make_direct_iterator(0);
+ *  std::advance(it, 4);
+ *  std::cout << *it; // prints 3
+ *
+ *  std::copy(ez::make_direct_iterator(1),
+ *            ez::make_direct_iterator(11),
+ *            std::ostream_iterator<int>(std::cout, " ")); // prints 1 2 3 4 5 6 7 8 9 10
+ *  \endcode */
 template <typename T>
 class direct_iterator {
 public:
 	typedef T value_type;
-	typedef typename details::difference_type<T>::type difference_type;
+	typedef typename detail::difference_type<T>::type difference_type;
 	typedef T const* pointer;
 	typedef T const& reference;
-	typedef typename details::iterator_tag<T>::tag iterator_category;
+	typedef typename detail::iterator_tag<T>::tag iterator_category;
 
 	direct_iterator() noexcept(std::is_nothrow_default_constructible<T>::value)
 	: m_value{} {
@@ -252,11 +261,11 @@ public:
 	: m_value{std::move(value)} {
 	}
 
-	constexpr reference operator*() const noexcept {
+	reference operator*() const noexcept {
 		return m_value;
 	}
 
-	constexpr pointer operator->() const noexcept {
+	pointer operator->() const noexcept {
 		return &m_value;
 	}
 
@@ -364,12 +373,7 @@ bool operator>=(direct_iterator<T> const& lhs, direct_iterator<T> const& rhs) {
 }
 
 template <typename T>
-std::ostream& operator<<(std::ostream& stream, direct_iterator<T> const& it) {
-	return stream << *it;
-}
-
-template <typename T>
-direct_iterator<T> make_direct_iterator(T value) {
+direct_iterator<T> make_direct_iterator(T const& value) {
 	return direct_iterator<T>{value};
 }
 

@@ -36,27 +36,25 @@ BOOST_AUTO_TEST_CASE(Constructor) {
 	BOOST_CHECK_EQUAL(D.left_closed(), false);
 	BOOST_CHECK_EQUAL(D.right_open(), true);
 	BOOST_CHECK_EQUAL(D.right_closed(), false);
+
+	BOOST_CHECK_THROW(ez::make_interval[0](0), ez::empty_interval);
+	BOOST_CHECK_THROW(ez::make_interval(0)[0], ez::empty_interval);
+	BOOST_CHECK_THROW(ez::make_interval(0)(0), ez::empty_interval);
+	BOOST_CHECK_THROW(ez::make_interval[1][0], ez::empty_interval);
 }
 
-BOOST_AUTO_TEST_CASE(EmptyTest) {
-	BOOST_CHECK(!empty(ez::interval<int>{ez::make_interval[0][0]}));
-	BOOST_CHECK(empty(ez::interval<int>{ez::make_interval[0](0)}));
-	BOOST_CHECK(empty(ez::interval<int>{ez::make_interval(0)[0]}));
-	BOOST_CHECK(empty(ez::interval<int>{ez::make_interval(0)(0)}));
+BOOST_AUTO_TEST_CASE(BeginEndTest) {
+	ez::interval<int> A = ez::make_interval(0)[4];
+	BOOST_CHECK_EQUAL(*A.begin(), 1);
+	BOOST_CHECK_EQUAL(*A.cbegin(), 1);
+	BOOST_CHECK_EQUAL(*A.end(), 5);
+	BOOST_CHECK_EQUAL(*A.cend(), 5);
 
-	BOOST_CHECK(!empty(ez::interval<int>{ez::make_interval[0][1]}));
-	BOOST_CHECK(!empty(ez::interval<int>{ez::make_interval[0](1)}));
-	BOOST_CHECK(!empty(ez::interval<int>{ez::make_interval(0)[1]}));
-	BOOST_CHECK(!empty(ez::interval<int>{ez::make_interval(0)(1)}));
-
-	BOOST_CHECK(empty(ez::interval<int>{ez::make_interval[1][0]}));
-	BOOST_CHECK(empty(ez::interval<int>{ez::make_interval[1](0)}));
-	BOOST_CHECK(empty(ez::interval<int>{ez::make_interval(1)[0]}));
-	BOOST_CHECK(empty(ez::interval<int>{ez::make_interval(1)(0)}));
-
-	BOOST_CHECK(static_cast<bool>(ez::interval<int>{ez::make_interval[0][0]}));
-	BOOST_CHECK(static_cast<bool>(ez::interval<int>{ez::make_interval[0][1]}));
-	BOOST_CHECK(!static_cast<bool>(ez::interval<int>{ez::make_interval[1][0]}));
+	ez::interval<int> B = ez::make_interval[0](4);
+	BOOST_CHECK_EQUAL(*B.begin(), 0);
+	BOOST_CHECK_EQUAL(*B.cbegin(), 0);
+	BOOST_CHECK_EQUAL(*B.end(), 4);
+	BOOST_CHECK_EQUAL(*B.cend(), 4);
 }
 
 BOOST_AUTO_TEST_CASE(EqualityTest) {
@@ -69,26 +67,16 @@ BOOST_AUTO_TEST_CASE(EqualityTest) {
 	BOOST_CHECK(ez::interval<int>{ez::make_interval[0](1)} != ez::interval<int>{ez::make_interval(0)[1]});
 	BOOST_CHECK(ez::interval<int>{ez::make_interval[0](1)} != ez::interval<int>{ez::make_interval(0)(1)});
 	BOOST_CHECK(ez::interval<int>{ez::make_interval(0)[1]} != ez::interval<int>{ez::make_interval(0)(1)});
-
-	BOOST_CHECK(ez::interval<int>{ez::make_interval[1][0]} != ez::interval<int>{ez::make_interval[5](-3)});
-}
-
-BOOST_AUTO_TEST_CASE(Assign) {
-
 }
 
 BOOST_AUTO_TEST_CASE(Singleton) {
 	BOOST_CHECK(singleton(ez::interval<int>{ez::make_interval[0][0]}));
-	BOOST_CHECK(!singleton(ez::interval<int>{ez::make_interval(0)[0]}));
-	BOOST_CHECK(!singleton(ez::interval<int>{ez::make_interval[0](0)}));
-	BOOST_CHECK(!singleton(ez::interval<int>{ez::make_interval(0)(0)}));
-
 	BOOST_CHECK(singleton(ez::interval<int>{ez::make_interval[1][1]}));
 	BOOST_CHECK(!singleton(ez::interval<int>{ez::make_interval[0][1]}));
 }
 
 BOOST_AUTO_TEST_CASE(CommonPropertiesTest) {
-	ez::interval<int> const int_interval = ez::interval<int>{ez::make_interval(-6)[9]};
+	ez::interval<int> const int_interval = ez::make_interval(-6)[9];
 	BOOST_CHECK_EQUAL(15, diameter(int_interval));
 	BOOST_CHECK_EQUAL(1, midpoint(int_interval));
 	BOOST_CHECK_EQUAL(7, radius(int_interval));
@@ -100,19 +88,12 @@ BOOST_AUTO_TEST_CASE(CommonPropertiesTest) {
 	BOOST_CHECK_EQUAL(15.0, diameter(double_interval));
 	BOOST_CHECK_EQUAL(1.5, midpoint(double_interval));
 	BOOST_CHECK_EQUAL(7.5, radius(double_interval));
+}
 
-	ez::interval<int> const bad_interval = ez::interval<int>{ez::make_interval(1)[0]};
-	BOOST_CHECK_THROW(diameter(bad_interval), ez::empty_interval);
-	BOOST_CHECK_THROW(midpoint(bad_interval), ez::empty_interval);
-	BOOST_CHECK_THROW(radius(bad_interval),   ez::empty_interval);
-
-	BOOST_CHECK_EQUAL(diameter(bad_interval, -1), -1);
-	BOOST_CHECK_EQUAL(midpoint(bad_interval, -1), -1);
-	BOOST_CHECK_EQUAL(radius(bad_interval, -1), -1);
-
-	BOOST_CHECK_EQUAL(diameter(bad_interval, -1.5), -1.5);
-	BOOST_CHECK_EQUAL(midpoint(bad_interval, -1.5), -1.5);
-	BOOST_CHECK_EQUAL(radius(bad_interval, -1.5), -1.5);
+BOOST_AUTO_TEST_CASE(Casting) {
+	ez::interval<int> const a = ez::make_interval[0][0];
+	auto b = ez::interval_cast<double>(a);
+	static_assert(std::is_same<decltype(b)::type, double>::value, "");
 }
 
 BOOST_AUTO_TEST_CASE(Contains) {
@@ -174,10 +155,8 @@ BOOST_AUTO_TEST_CASE(Intersection) {
 		                  ez::interval<int>{ez::make_interval(1)(2)});
 	}
 
-	ez::interval<int> const empty_interval =
-	    intersection(ez::interval<int>{ez::make_interval[0][1]},
-	                 ez::interval<int>{ez::make_interval[3][4]});
-	BOOST_CHECK(empty(empty_interval));
+	BOOST_CHECK_THROW(intersection(ez::interval<int>{ez::make_interval[0][1]},
+	                 ez::interval<int>{ez::make_interval[3][4]}), ez::empty_interval);
 }
 
 BOOST_AUTO_TEST_CASE(Subsets) {
@@ -229,36 +208,6 @@ BOOST_AUTO_TEST_CASE(Subsets) {
 		BOOST_CHECK(superset(B, A));
 		BOOST_CHECK(proper_subset(A, B));
 		BOOST_CHECK(proper_superset(B, A));
-	}
-
-	{
-		ez::interval<int> const A = ez::make_interval(0)(0);
-		ez::interval<int> const B = ez::make_interval[1](2);
-
-		BOOST_CHECK(subset(A, B));
-		BOOST_CHECK(superset(B, A));
-		BOOST_CHECK(proper_subset(A, B));
-		BOOST_CHECK(proper_superset(B, A));
-	}
-
-	{
-		ez::interval<int> const A = ez::make_interval(0)[1];
-		ez::interval<int> const B = ez::make_interval(2)(2);
-
-		BOOST_CHECK(!subset(A, B));
-		BOOST_CHECK(!superset(B, A));
-		BOOST_CHECK(!proper_subset(A, B));
-		BOOST_CHECK(!proper_superset(B, A));
-	}
-
-	{
-		ez::interval<int> const A = ez::make_interval(0)(0);
-		ez::interval<int> const B = ez::make_interval(2)(2);
-
-		BOOST_CHECK(subset(A, B));
-		BOOST_CHECK(superset(B, A));
-		BOOST_CHECK(!proper_subset(A, B));
-		BOOST_CHECK(!proper_superset(B, A));
 	}
 }
 

@@ -29,6 +29,11 @@ std::ostream& operator<<(std::ostream& stream, std::forward_list<int>::iterator 
 	return stream << reinterpret_cast<intptr_t>(&*it);
 }
 
+template <typename T>
+std::ostream& operator<<(std::ostream& stream, ez::direct_iterator<T> it) {
+	return stream << *it;
+}
+
 }
 
 BOOST_AUTO_TEST_SUITE(direct_iterator)

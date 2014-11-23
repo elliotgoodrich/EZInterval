@@ -44,23 +44,9 @@
 
 namespace ez {
 
-/** An empty_interval exception is thrown when an empty interval is used in a place where a
-	non-empty interval is expected, for example diameter(). */
-class empty_interval : public std::logic_error {
-public:
-	using std::logic_error::logic_error;
-};
+template <typename T, bool LOpen, bool ROpen>
+class basic_interval;
 
-/** A divide_by_zero exception is thrown when an interval is divided by zero or an interval
-	that contains zero. */
-struct divide_by_zero : std::runtime_error {
-	divide_by_zero()
-	: std::runtime_error{"Division by zero"} {
-	}
-};
-
-/* Everything in the detail namespace should be seen as implementation details and liable to change.
-   I recommend not relying on anything in there. */
 namespace detail {
 
 /* This struct will have type as an alias for the first non-void type in First, ...Rest. */
@@ -79,14 +65,79 @@ bool lt_first_gt_second(std::pair<T, U> const& lhs, std::pair<T, U> const& rhs) 
 	return (lhs.first == rhs.first) ? lhs.second > rhs.second : lhs.first < rhs.first;
 }
 
+template <typename T>
+bool valid(T const& lower, T const& upper, bool left_open, bool right_open) {
+	return (left_open || right_open) ? lower < upper : lower <= upper;
 }
 
-/** A trait to decide if a type T is either an instance of the class interval or basic_interval. */
 template <typename T>
-struct is_interval : std::false_type {};
+T next_if_true(T value, bool b) {
+	return b ? ++value : value;
+}
 
-/** This class represents a mathematical interval that can be iterated over if the underlying type
-	is exact. */
+template <typename L, bool LOpen>
+class lower_bound {
+public:
+	lower_bound(L const& lower) noexcept(std::is_nothrow_copy_constructible<L>::value)
+	: m_lower{lower} {
+	}
+
+	basic_interval<L, LOpen, true> operator()(L const& upper) const {
+		return {m_lower, upper};
+	}
+
+	basic_interval<L, LOpen, false> operator[](L const& upper) const {
+		return {m_lower, upper};
+	}
+
+private:
+	L m_lower;
+};
+
+class interval_factory {
+public:
+	template <typename L>
+	lower_bound<L, true> operator()(L const& lower) const {
+		return {lower};
+	}
+
+	template <typename L>
+	lower_bound<L, false> operator[](L const& lower) const {
+		return {lower};
+	}
+};
+
+}
+
+/** An empty_interval exception is thrown when trying to construct an interval that is empty. */
+struct empty_interval : public std::runtime_error {
+public:
+	empty_interval()
+	: std::runtime_error{"Empty interval"} {
+	}
+};
+
+/** A divide_by_zero exception is thrown when an interval is divided by zero or an interval
+ *  that contains zero. */
+struct divide_by_zero : std::runtime_error {
+	divide_by_zero()
+	: std::runtime_error{"Division by zero"} {
+	}
+};
+
+template <typename T>
+struct is_nothrow_totally_ordered {
+	static bool const value =
+	  noexcept(std::declval<T&>() < std::declval<T&>()) &&
+	  noexcept(std::declval<T&>() > std::declval<T&>()) &&
+	  noexcept(std::declval<T&>() <= std::declval<T&>()) &&
+	  noexcept(std::declval<T&>() >= std::declval<T&>()) &&
+	  noexcept(std::declval<T&>() == std::declval<T&>()) &&
+	  noexcept(std::declval<T&>() != std::declval<T&>());
+};
+
+/** A class to represent a mathematical interval of type T where the openness can be changed at
+ *  run-time. */
 template <typename T, bool LOpen, bool ROpen>
 class basic_interval {
 public:
@@ -94,68 +145,66 @@ public:
 	typedef typename direct_iterator<T>::difference_type difference_type;
 
 	basic_interval(T const& lower, T const& upper)
-		noexcept(std::is_nothrow_copy_constructible<T>::value)
 	: m_lower{lower}
 	, m_upper{upper} {
+		if(!detail::valid(m_lower, m_upper, LOpen, ROpen)) {
+			throw empty_interval{};
+		}
 	}
 
-	/** Returns the lowerbound. */
-	constexpr T const& lower() const noexcept {
+	T const& lower() const noexcept {
 		return m_lower;
 	}
 
-	/** Returns the upperbound. */
-	constexpr T const& upper() const noexcept {
+	T const& upper() const noexcept {
 		return m_upper;
 	}
 
-	/** Assign new values to the interval. */
-	void assign(T const& lower, T const& upper)
-	  noexcept(std::is_nothrow_copy_constructible<T>::value) {
+	void assign(T const& lower, T const& upper) {
+		if(!detail::valid(lower, upper, LOpen, ROpen)) {
+			throw empty_interval{};
+		}
+
 		m_lower = lower;
 		m_upper = upper;
 	}
 
-	/** Returns true if this interval is left-open. */
-	constexpr bool left_open() const noexcept {
+	bool left_open() const noexcept {
 		return LOpen;
 	}
 
-	/** Returns true if this interval is left-closed. */
-	constexpr bool left_closed() const noexcept {
+	bool left_closed() const noexcept {
 		return !LOpen;
 	}
 
-	/** Returns true if this interval is right-open. */
-	constexpr bool right_open() const noexcept {
+	bool right_open() const noexcept {
 		return ROpen;
 	}
 
-	/** Returns true if this interval is right-closed. */
-	constexpr bool right_closed() const noexcept {
+	bool right_closed() const noexcept {
 		return !ROpen;
 	}
 
-	/** Same as the empty() function. */
-	explicit operator bool() const {
-		return !empty(*this);
-	}
-
 	direct_iterator<T> begin() const {
-		return make_direct_iterator(m_lower);
+		return make_direct_iterator(detail::next_if_true(m_lower, left_open()));
 	}
 
 	direct_iterator<T> end() const {
-		return make_direct_iterator(m_upper);
+		return make_direct_iterator(detail::next_if_true(m_upper, right_closed()));
+	}
+
+	direct_iterator<T> cbegin() const {
+		return make_direct_iterator(detail::next_if_true(m_lower, left_open()));
+	}
+
+	direct_iterator<T> cend() const {
+		return make_direct_iterator(detail::next_if_true(m_upper, right_closed()));
 	}
 
 private:
 	T m_lower;
 	T m_upper;
 };
-
-template <typename T, bool LOpen, bool ROpen>
-struct is_interval<basic_interval<T, LOpen, ROpen>> : std::true_type {};
 
 /** Type alias for an open interval. */
 template <typename T>
@@ -179,14 +228,15 @@ using ropen_interval = basic_interval<T, false, true>;
 
 template <typename T, bool LOpen, bool ROpen>
 basic_interval<T, LOpen, ROpen>& operator+=(basic_interval<T, LOpen, ROpen>& l,
-											basic_interval<T, LOpen, ROpen> const& r) {
+                                            basic_interval<T, LOpen, ROpen> const& r) {
 	l.assign(l.lower() + r.lower(), l.upper() + r.upper());
 	return l;
 }
 
 template <typename T, bool LOpen, bool ROpen>
-basic_interval<T, LOpen, ROpen>& operator+=(basic_interval<T, LOpen, ROpen>& l,
-											typename basic_interval<T, LOpen, ROpen>::difference_type const& d) {
+basic_interval<T, LOpen, ROpen>&
+  operator+=(basic_interval<T, LOpen, ROpen>& l,
+             typename basic_interval<T, LOpen, ROpen>::difference_type const& d) {
 	l.assign(l.lower() + d, l.upper() + d);
 	return l;
 }
@@ -199,17 +249,18 @@ basic_interval<T, LOpen, ROpen> operator-=(basic_interval<T, LOpen, ROpen>& l,
 }
 
 template <typename T, bool LOpen, bool ROpen>
-basic_interval<T, LOpen, ROpen>& operator-=(basic_interval<T, LOpen, ROpen>& l,
-											typename basic_interval<T, LOpen, ROpen>::difference_type const& d) {
+basic_interval<T, LOpen, ROpen>&
+  operator-=(basic_interval<T, LOpen, ROpen>& l,
+             typename basic_interval<T, LOpen, ROpen>::difference_type const& d) {
 	l.assign(l.lower() - d, l.upper() - d);
 	return l;
 }
 
 template <typename T, bool Open>
 basic_interval<T, Open, Open>& operator*=(basic_interval<T, Open, Open>& l,
-										  basic_interval<T, Open, Open> const& r) {
+                                          basic_interval<T, Open, Open> const& r) {
 	auto const result = std::minmax({l.lower() * r.lower(), l.lower() * r.upper(),
-									 l.upper() * r.lower(), l.upper() * r.upper()});
+	                                 l.upper() * r.lower(), l.upper() * r.upper()});
 	l.assign(result.first, result.second);
 	return l;
 }
@@ -222,13 +273,13 @@ basic_interval<T, LOpen, ROpen>& operator*=(basic_interval<T, LOpen, ROpen>& l, 
 
 template <typename T, bool Open>
 basic_interval<T, Open, Open>& operator/=(basic_interval<T, Open, Open>& l,
-										  basic_interval<T, Open, Open> const& r) {
+                                          basic_interval<T, Open, Open> const& r) {
 	if(contains(r, 0)) {
 		throw divide_by_zero{};
 	}
 
 	auto const result = std::minmax({l.lower() / r.lower(), l.lower() / r.upper(),
-									 l.upper() / r.lower(), l.upper() / r.upper()});
+	                                 l.upper() / r.lower(), l.upper() / r.upper()});
 	l.assign(result.first, result.second);
 	return l;
 }
@@ -249,43 +300,47 @@ basic_interval<T, LOpen, ROpen>& operator/=(basic_interval<T, LOpen, ROpen>& l, 
 
 template <typename T, bool LOpen, bool ROpen>
 basic_interval<T, LOpen, ROpen> operator+(basic_interval<T, LOpen, ROpen> l,
-										  basic_interval<T, LOpen, ROpen> const& r) {
+                                          basic_interval<T, LOpen, ROpen> const& r) {
 	return l += r;
 }
 
 template <typename T, bool LOpen, bool ROpen>
-basic_interval<T, LOpen, ROpen> operator+(basic_interval<T, LOpen, ROpen> l,
-										  typename basic_interval<T, LOpen, ROpen>::difference_type const& d) {
+basic_interval<T, LOpen, ROpen>
+  operator+(basic_interval<T, LOpen, ROpen> l,
+            typename basic_interval<T, LOpen, ROpen>::difference_type const& d) {
 	return l += d;
 }
 
 template <typename T, bool LOpen, bool ROpen>
-basic_interval<T, LOpen, ROpen> operator+(typename basic_interval<T, LOpen, ROpen>::difference_type const& d,
-										  basic_interval<T, LOpen, ROpen> l) {
+basic_interval<T, LOpen, ROpen>
+  operator+(typename basic_interval<T, LOpen, ROpen>::difference_type const& d,
+            basic_interval<T, LOpen, ROpen> l) {
 	return l += d;
 }
 
 template <typename T, bool LOpen, bool ROpen>
 basic_interval<T, LOpen, ROpen> operator-(basic_interval<T, LOpen, ROpen> l,
-										  basic_interval<T, ROpen, LOpen> const& r) {
+                                          basic_interval<T, ROpen, LOpen> const& r) {
 	return l -= r;
 }
 
 template <typename T, bool LOpen, bool ROpen>
-basic_interval<T, LOpen, ROpen> operator-(basic_interval<T, LOpen, ROpen> l,
-										  typename basic_interval<T, LOpen, ROpen>::difference_type const& d) {
+basic_interval<T, LOpen, ROpen>
+  operator-(basic_interval<T, LOpen, ROpen> l,
+            typename basic_interval<T, LOpen, ROpen>::difference_type const& d) {
 	return l -= d;
 }
 
 template <typename T, bool LOpen, bool ROpen>
-basic_interval<T, LOpen, ROpen> operator-(typename basic_interval<T, LOpen, ROpen>::difference_type const& d,
-										  basic_interval<T, LOpen, ROpen> l) {
+basic_interval<T, LOpen, ROpen>
+  operator-(typename basic_interval<T, LOpen, ROpen>::difference_type const& d,
+            basic_interval<T, LOpen, ROpen> l) {
 	return l -= d;
 }
 
 template <typename T, bool Open>
 basic_interval<T, Open, Open> operator*(basic_interval<T, Open, Open> l,
-										basic_interval<T, Open, Open> const& r) {
+                                        basic_interval<T, Open, Open> const& r) {
 	return l *= r;
 }
 
@@ -301,7 +356,7 @@ basic_interval<T, LOpen, ROpen> operator*(T const& d, basic_interval<T, LOpen, R
 
 template <typename T, bool Open>
 basic_interval<T, Open, Open> operator/(basic_interval<T, Open, Open> l,
-										basic_interval<T, Open, Open> const& r) {
+                                        basic_interval<T, Open, Open> const& r) {
 	return l /= r;
 }
 
@@ -323,7 +378,8 @@ enum openness : openness_t {
 	open       = 0x3,
 };
 
-/** A class to represent a mathematical interval of type T.
+/** A class to represent a mathematical interval of type T where the openness can be changed at
+ *  run-time.
  *
  *  The difference between this class and basic_interval<T, bool, bool> is that whether an
  *  interval is left-open or right-open is dynamic and not part of the type. This means that you
@@ -336,34 +392,40 @@ enum openness : openness_t {
  *  s.assign(s.lower(), 5);
  *  interval<T> t = union(r, s);
  *  std::cout << t << std::endl; // [0, 5]
- *  \endcode
- */
+ *  \endcode */
 template <typename T>
 class interval {
 public:
 	typedef T type;
+	typedef typename direct_iterator<T>::difference_type difference_type;
 
 	template <bool LOpen, bool ROpen>
 	interval(basic_interval<T, LOpen, ROpen> const& r)
-		noexcept(std::is_nothrow_constructible<T>::value)
 	: m_lower{r.lower()}
 	, m_upper{r.upper()}
 	, m_openness{static_cast<ez::openness>(LOpen * ez::left_open + ROpen * ez::right_open)} {
+		if(!detail::valid(m_lower, m_upper, LOpen, ROpen)) {
+			throw empty_interval{};
+		}
 	}
 
 	interval(T const& lower, T const& upper, ez::openness o)
-	  noexcept(std::is_nothrow_copy_assignable<T>::value)
 	: m_lower{lower}
 	, m_upper{upper}
 	, m_openness{o} {
+		if(!detail::valid(m_lower, m_upper, left_open(), right_open())) {
+			throw empty_interval{};
+		}
 	}
 
 	interval(T const& lower, T const& upper, bool left_open, bool right_open)
-		noexcept(std::is_nothrow_copy_assignable<T>::value)
 	: m_lower{lower}
 	, m_upper{upper}
 	, m_openness{left_open ? (right_open ? ez::open : ez::left_open)
 	                       : (right_open ? ez::right_open : ez::closed)} {
+		if(!detail::valid(m_lower, m_upper, left_open, right_open)) {
+			throw empty_interval{};
+		}
 	}
 
 	interval(interval<T> const&) = default;
@@ -380,52 +442,62 @@ public:
 	interval<T>& operator=(interval<T> const&) = default;
 	interval<T>& operator=(interval<T>&&) = default;
 
-	/** Returns the lowerbound. */
 	T const& lower() const noexcept {
 		return m_lower;
 	}
 
-	/** Returns the upperbound. */
 	T const& upper() const noexcept {
 		return m_upper;
 	}
 
-	/** Assign new values to the interval. */
-	void assign(T const& lower, T const& upper) noexcept(std::is_nothrow_copy_assignable<T>::value) {
+	void assign(T const& lower, T const& upper) {
+		if(!detail::valid(m_lower, m_upper, left_open(), right_open())) {
+			throw empty_interval{};
+		}
+
 		m_lower = lower;
 		m_upper = upper;
 	}
 
-	/** Set the interval to be left open if \a left_open is true and to be right open if
-		\a right_open is true. */
-	void set_open(bool left_open, bool right_open) noexcept {
-		m_openness = static_cast<openness>((ez::left_open * left_open) +
-										   (ez::right_open * right_open));
+	void set_open(bool left_open, bool right_open) {
+		if(!detail::valid(m_lower, m_upper, left_open, right_open)) {
+			throw empty_interval{};
+		}
+
+		m_openness = static_cast<openness>(ez::left_open * left_open +
+		                                   ez::right_open * right_open);
 	}
 
-	/** Returns true if this interval is left-open. */
 	bool left_open() const noexcept {
 		return m_openness & ez::left_open;
 	}
 
-	/** Returns true if this interval is left-closed. */
 	bool left_closed() const noexcept {
 		return !left_open();
 	}
 
-	/** Returns true if this interval is right-open. */
 	bool right_open() const noexcept {
 		return m_openness & ez::right_open;
 	}
 
-	/** Returns true if this interval is right-closed. */
 	bool right_closed() const noexcept {
 		return !right_open();
 	}
 
-	/** Returns true if this interval is not empty. */
-	explicit operator bool() const noexcept {
-		return !empty(*this);
+	direct_iterator<T> begin() const {
+		return make_direct_iterator(detail::next_if_true(m_lower, left_open()));
+	}
+
+	direct_iterator<T> end() const {
+		return make_direct_iterator(detail::next_if_true(m_upper, right_closed()));
+	}
+
+	direct_iterator<T> cbegin() const {
+		return make_direct_iterator(detail::next_if_true(m_lower, left_open()));
+	}
+
+	direct_iterator<T> cend() const {
+		return make_direct_iterator(detail::next_if_true(m_upper, right_closed()));
 	}
 
 private:
@@ -434,16 +506,14 @@ private:
 	openness m_openness;
 };
 
-template <typename T>
-struct is_interval<interval<T>> : std::true_type {};
-
 /***************************************************************************************************
 * Compound assignment operators for interval                                                       *
 ***************************************************************************************************/
 
 template <typename T, typename Interval>
 interval<T>& operator+=(interval<T>& l, Interval const& r) {
-	static_assert(std::is_same<T, typename Interval::type>::value, "Need same type.");
+	static_assert(std::is_same<T, typename Interval::type>::value,
+	              "Underlying types of intervals must be equal");
 	l.assign(l.lower() + r.lower(), l.upper() + r.upper());
 	l.set_open(l.left_open() || r.left_open(), l.right_open() || r.right_open());
 	return l;
@@ -474,10 +544,18 @@ interval<T>& operator*=(interval<T>& l, interval<T> const& r) {
 	// is closed and min(true, false) = false;
 	auto const zero = T{0};
 	auto const choices = {
-	  std::make_pair(l.lower() * r.lower(), (l.left_open()  && r.left_open())  || (l.left_open()  && r.lower() != zero) || (r.left_open()  && l.lower() != zero)),
-	  std::make_pair(l.lower() * r.upper(), (l.left_open()  && r.right_open()) || (l.left_open()  && r.upper() != zero) || (r.right_open() && l.lower() != zero)),
-	  std::make_pair(l.upper() * r.lower(), (l.right_open() && r.left_open())  || (l.right_open() && r.lower() != zero) || (r.left_open()  && l.upper() != zero)),
-	  std::make_pair(l.upper() * r.upper(), (l.right_open() && r.right_open()) || (l.right_open() && r.upper() != zero) || (r.right_open() && l.upper() != zero))
+	  std::make_pair(l.lower() * r.lower(), (l.left_open() && r.left_open())     ||
+	                                        (l.left_open() && r.lower() != zero) ||
+	                                        (r.left_open() && l.lower() != zero)),
+	  std::make_pair(l.lower() * r.upper(), (l.left_open() && r.right_open())     ||
+	                                        (l.left_open() && r.upper()  != zero) ||
+	                                        (r.right_open() && l.lower() != zero)),
+	  std::make_pair(l.upper() * r.lower(), (l.right_open() && r.left_open())     ||
+	                                        (l.right_open() && r.lower() != zero) ||
+	                                        (r.left_open()  && l.upper() != zero)),
+	  std::make_pair(l.upper() * r.upper(), (l.right_open() && r.right_open())    ||
+	                                        (l.right_open() && r.upper() != zero) ||
+	                                        (r.right_open() && l.upper() != zero))
 	};
 
 	auto lower = std::min(choices);
@@ -558,7 +636,7 @@ interval<T> operator+(basic_interval<T, LOpen, ROpen> const& l, interval<T> r) {
 
 template <typename T, bool LOpen1, bool ROpen1, bool LOpen2, bool ROpen2>
 interval<T> operator+(basic_interval<T, LOpen1, ROpen1> l,
-					  basic_interval<T, LOpen2, ROpen2> const& r) {
+                      basic_interval<T, LOpen2, ROpen2> const& r) {
 	interval<T> x{std::move(l)};
 	return x += r;
 }
@@ -590,7 +668,7 @@ interval<T> operator-(basic_interval<T, LOpen, ROpen> const& l, interval<T> r) {
 
 template <typename T, bool LOpen1, bool ROpen1, bool LOpen2, bool ROpen2>
 interval<T> operator-(basic_interval<T, LOpen1, ROpen1> l,
-					  basic_interval<T, LOpen2, ROpen2> const& r) {
+                      basic_interval<T, LOpen2, ROpen2> const& r) {
 	interval<T> x{std::move(l)};
 	return x -= r;
 }
@@ -666,145 +744,105 @@ interval<T> operator/(interval<T> l, typename interval<T>::difference_type const
 ***************************************************************************************************/
 
 template <typename Interval1, typename Interval2>
-constexpr bool operator==(Interval1 const& lhs, Interval2 const& rhs) noexcept {
+bool operator==(Interval1 const& lhs, Interval2 const& rhs)
+  noexcept(is_nothrow_totally_ordered<typename Interval1::type>::value) {
+	static_assert(std::is_same<typename Interval1::type, typename Interval2::type>::value,
+	              "Underlying types of intervals must be equal");
 	return lhs.left_open()  == rhs.left_open()
-		&& lhs.right_open() == rhs.right_open()
-		&& lhs.lower()      == rhs.lower()
-		&& lhs.upper()      == rhs.upper();
+	    && lhs.right_open() == rhs.right_open()
+	    && lhs.lower()      == rhs.lower()
+	    && lhs.upper()      == rhs.upper();
 }
 
 template <typename Interval1, typename Interval2>
-constexpr bool operator!=(Interval1 const& lhs, Interval2 const& rhs) noexcept {
+bool operator!=(Interval1 const& lhs, Interval2 const& rhs)
+  noexcept(is_nothrow_totally_ordered<typename Interval1::type>::value) {
 	return !(lhs == rhs);
-}
-
-/** Returns true if the interval \a r is empty. */
-template <typename Interval>
-constexpr bool empty(Interval const& r) noexcept {
-	return (r.left_open() || r.right_open()) ? r.upper() <= r.lower()
-											 : r.upper() < r.lower();
 }
 
 /** Returns true if \a r contains only one element. */
 template <typename Interval>
-constexpr bool singleton(Interval const& r) noexcept {
+bool singleton(Interval const& r)
+  noexcept(is_nothrow_totally_ordered<typename Interval::type>::value) {
 	return r.left_closed() && r.right_closed() && (r.lower() == r.upper());
 }
 
+/** Converts an interval with underlying type To to an interval of underlying type From. */
 template <typename To, typename From>
 interval<To> interval_cast(interval<From> const& r) {
 	return {static_cast<To>(r.lower()), static_cast<To>(r.upper()), r.left_open(), r.right_open()};
 }
 
+/** Converts a basic_interval with underlying type To to an interval of underlying type From. */
 template <typename To, typename From, bool LOpen, bool ROpen>
 basic_interval<To, LOpen, ROpen> interval_cast(basic_interval<From, LOpen, ROpen> const& r) {
 	return {static_cast<To>(r.lower()), static_cast<To>(r.upper())};
 }
 
-/** Returns the difference between the upper and lower bounds of \a r.
-
-	If the interval is empty, then an empty_interval exception is thrown. */
+/** Returns the difference between the upper and lower bounds of \a r. */
 template <typename Interval, typename U = typename Interval::type>
 U diameter(Interval const& r) {
-	if(empty(r)) {
-		throw empty_interval{"The diameter of an empty interval is undefined."};
-	}
 	return static_cast<U>(r.upper()) - static_cast<U>(r.lower());
 }
 
-/** Returns the diameter of the interval \a r if it is not empty, else returns \a default_value. */
-template <typename U, typename Interval>
-U diameter(Interval const& r, U default_value) noexcept {
-	return empty(r) ? default_value : r.upper() - r.lower();
-}
-
 /** Returns the midpoint between the upper and lower bounds of \a r.
-
-	Pass an additional type if the underlying type of basic_interval is not appropriate. For
-	example, if you have an interval of [0, 3]. Then midpoint<int> will give (3-0)/2 = 1, but
-	midpoint<double> will give (3.0-1.0)/2 = 1.5. If the interval is empty then an empty_interval
-	exception is thrown.
-
-	\code
-	auto r = ez::make_interval[0][1];
-	auto a = ez::midpoint(r); // 0
-	auto b = ez::midpoint<double>(r); // 0.5
-	\endcode */
+ *
+ *  Pass an additional type if the underlying type of basic_interval is not appropriate. For
+ *  example, if you have an interval of [0, 3]. Then midpoint<int> will give (3-0)/2 = 1, but
+ *  midpoint<double> will give (3.0-1.0)/2 = 1.5.
+ *
+ *  \code
+ *  auto r = ez::make_interval[0][1];
+ *  auto a = ez::midpoint(r); // 0
+ *  auto b = ez::midpoint<double>(r); // 0.5
+ *  \endcode */
 template <typename U = void, typename Interval,
-		  typename Return = typename detail::first_non_void<U, typename Interval::type>::type>
+          typename Return = typename detail::first_non_void<U, typename Interval::type>::type>
 Return midpoint(Interval const& r) {
-	if(empty(r)) {
-		throw empty_interval{"The midpoint of an empty interval is undefined."};
-	}
 	return static_cast<Return>(r.lower()) +
-		(static_cast<Return>(r.upper()) - static_cast<Return>(r.lower())) / 2;
-}
-
-/** Returns the midpoint between the upper and lower bounds of \a r if it is not empty, else returns
-	\a default_value.
-
-	As the return type of this function will be the type of \a default_value, make sure it is correct
-	or specify the return type when calling the function.
-
-	\code
-	// m has type double which is deduced from the type of 0.0
-	auto m = ez::midpoint(ez::make_interval[3][6], 0.0);
-
-	// Here it may be more readable to specify the return type instead of writing
-	// static_cast<std::maxint_t>(-1)
-	auto n = ez::midpoint<std::maxint_t>(ez::make_interval(0)(9), -1);
-   \endcode */
-template <typename U, typename Interval>
-U midpoint(Interval const& r, U default_value) {
-	return empty(r) ? default_value
-					: static_cast<U>(r.lower()) +
-						(static_cast<U>(r.upper()) - static_cast<U>(r.lower())) / 2;
+	  (static_cast<Return>(r.upper()) - static_cast<Return>(r.lower())) / 2;
 }
 
 /** Returns half of the diameter of \a r.
-
-	Pass a different type if you are worried about rounding issues with the underlying type.
-
-	\code
-	auto i = ez::make_interval[3][8];
-	auto r = ez::radius(i); // 2
-	auto s = ez::radius<double>(i); // 2.5
-	\endcode */
+ *
+ *  Pass a different type if you are worried about rounding issues with the underlying type.
+ *
+ *  \code
+ *  auto i = ez::make_interval[3][8];
+ *  auto r = ez::radius(i); // 2
+ *  auto s = ez::radius<double>(i); // 2.5
+ *  \endcode */
 template <typename U = void, typename Interval,
-		  typename Return = typename detail::first_non_void<U, typename Interval::type>::type>
+          typename Return = typename detail::first_non_void<U, typename Interval::type>::type>
 Return radius(Interval const& r) {
-	if(empty(r)) {
-		throw empty_interval{"The midpoint of an empty interval is undefined."};
-	}
 	return static_cast<Return>(diameter(r)) / 2;
-}
-
-/** Returns half of the diameter of \a r if it is not empty, else return \a default_value.
-
-	As the return type of this function will be the type of \a default_value, make sure it is correct
-	or specify the return type when calling the function.
-
-	\code
-	auto r = ez::radius(ez::make_interval(4)(2), 0); // 0
-	auto s = ez::radius(ez::make_interval(1)(4), -1.0); // 1.5
-	\endcode */
-template <typename U, typename Interval>
-U radius(Interval const& r, U default_value) {
-	return empty(r) ? default_value : static_cast<U>(diameter(r)) / 2;
 }
 
 /** Returns true if \a value is within the interval \a r. */
 template <typename Interval>
-constexpr bool contains(Interval const& r, typename Interval::type const& value) {
+bool contains(Interval const& r, typename Interval::type const& value)
+  noexcept(is_nothrow_totally_ordered<typename Interval::type>::value) {
 	return (r.left_open()  ? r.lower() < value : r.lower() <= value) &&
-		   (r.right_open() ? r.upper() > value : r.upper() >= value);
+	       (r.right_open() ? r.upper() > value : r.upper() >= value);
 }
 
+/** Converts an interval to closed
+ *
+ *  \code
+ *  auto a = ez::interval<int>(0, 1, ez::open);
+ *  auto b = make_closed(a); // b is now of type ez::closed_interval<int>
+ *  \endcode */
 template <typename Interval>
 closed_interval<typename Interval::type> make_closed(Interval const& r) {
 	return {r.lower(), r.upper()};
 }
 
+/** Converts an interval to open
+ *
+ *  \code
+ *  auto a = ez::interval<int>(0, 1, ez::closed);
+ *  auto b = make_open(a); // b is now of type ez::open_interval<int>
+ *  \endcode */
 template <typename Interval>
 open_interval<typename Interval::type> make_open(Interval const& r) {
 	return {r.lower(), r.upper()};
@@ -814,8 +852,8 @@ open_interval<typename Interval::type> make_open(Interval const& r) {
 template <typename T>
 std::ostream& operator<<(std::ostream& stream, interval<T> const& r) {
 	return stream << (r.left_open() ? "(" : "[")
-				  << r.lower() << ", " << r.upper()
-				  << (r.right_open() ? ")" : "]");
+	              << r.lower() << ", " << r.upper()
+	              << (r.right_open() ? ")" : "]");
 }
 
 template <typename T, bool LOpen, bool ROpen>
@@ -824,194 +862,193 @@ std::ostream& operator<<(std::ostream& stream, basic_interval<T, LOpen, ROpen> c
 }
 
 /** Returns the interval intersection between \a lhs and \a rhs.
-
-	Note that the value type of Interval1 and Interval2 must be the same. This function returns an
-	object of type interval<T> because the openness of the return value is dependent on the lower
-	and upper bounds of both \a lhs and \a rhs.
-
-	\code
-	auto a = ez::make_interval[-1][5];
-	auto b = ez::make_interval(1)(6);
-	assert(intersection(a, b) == ez::make_interval(1)[5]);
-	\endcode */
+ *
+ *  Note that the value type of Interval1 and Interval2 must be the same. This function returns an
+ *  object of type interval<T> because the openness of the return value is dependent on the lower
+ *  and upper bounds of both \a lhs and \a rhs.
+ *
+ *  If there is no intersection between \a lhs and \a rhs then this function will throw when
+ *  constructing the return object.
+ *
+ *  \code
+ *  auto a = ez::make_interval[-1][5];
+ *  auto b = ez::make_interval(1)(6);
+ *  assert(intersection(a, b) == ez::make_interval(1)[5]);
+ *  \endcode */
 template <typename Interval1, typename Interval2>
 interval<typename Interval1::type> intersection(Interval1 const& lhs,
-												Interval2 const& rhs) noexcept {
+                                                Interval2 const& rhs) {
 	static_assert(std::is_same<typename Interval1::type, typename Interval2::type>::value,
-				  "Need same type.");
+	              "Underlying types of intervals must be equal");
 	typedef typename Interval1::type T;
 
 	auto const lower = std::max(std::make_pair(lhs.lower(), lhs.left_open()),
-						  std::make_pair(rhs.lower(), rhs.left_open()));
+	                            std::make_pair(rhs.lower(), rhs.left_open()));
 	auto const upper = std::min(std::make_pair(lhs.upper(), lhs.right_open()),
-						  std::make_pair(rhs.upper(), rhs.right_open()),
-						  detail::lt_first_gt_second<T, bool>);
+	                            std::make_pair(rhs.upper(), rhs.right_open()),
+	                            detail::lt_first_gt_second<T, bool>);
 
 	return {lower.first, upper.first, lower.second, upper.second};
 }
 
 /** Returns the interval intersection between \a lhs and \a rhs.
-
-	\code
-	auto a = ez::make_interval[3](6);
-	auto b = ez::make_interval[1](8);
-	assert(intersection(a, b) == ez::make_interval[3](6));
-	\endcode */
+ *
+ *  \code
+ *  auto a = ez::make_interval[3](6);
+ *  auto b = ez::make_interval[1](8);
+ *  assert(intersection(a, b) == ez::make_interval[3](6));
+ *  \endcode */
 template <typename T, bool LOpen, bool ROpen>
 basic_interval<T, LOpen, ROpen> intersection(basic_interval<T, LOpen, ROpen> const& lhs,
-											 basic_interval<T, LOpen, ROpen> const& rhs) noexcept {
+                                             basic_interval<T, LOpen, ROpen> const& rhs) {
 	return {std::max(lhs.lower(), rhs.lower()), std::min(lhs.upper(), rhs.upper())};
 }
 
 /** Returns the smallest interval containing both \a lhs and \a rhs.
-
-	\code
-	auto a = ez::make_interval[3][9];
-	auto b = ez::make_interval(1)(8);
-	assert(hull(a, b) == ez::make_interval(1)[9]);
-	\endcode */
+ *
+ *  \code
+ *  auto a = ez::make_interval[3][9];
+ *  auto b = ez::make_interval(1)(8);
+ *  assert(hull(a, b) == ez::make_interval(1)[9]);
+ *  \endcode */
 template <typename Interval1, typename Interval2>
-interval<typename Interval1::type> hull(Interval1 const& lhs,
-										Interval2 const& rhs) noexcept {
+interval<typename Interval1::type> hull(Interval1 const& lhs, Interval2 const& rhs)
+  noexcept(is_nothrow_totally_ordered<typename Interval1::type>::value) {
 	static_assert(std::is_same<typename Interval1::type, typename Interval2::type>::value,
-				  "Need same type.");
+	              "Underlying types of intervals must be equal");
 	typedef typename  Interval1::type T;
 
 	auto const lower = std::min(std::make_pair(lhs.lower(), lhs.left_open()),
-								std::make_pair(rhs.lower(), rhs.left_open()));
+	                            std::make_pair(rhs.lower(), rhs.left_open()));
 	auto const upper = std::max(std::make_pair(lhs.upper(), lhs.right_open()),
-								std::make_pair(rhs.upper(), rhs.right_open()),
-								detail::lt_first_gt_second<T, bool>);
+	                            std::make_pair(rhs.upper(), rhs.right_open()),
+	                            detail::lt_first_gt_second<T, bool>);
 
 	return {lower.first, upper.first, lower.second, upper.second};
 }
 
+/** Returns the smallest basic_interval containing both \a lhs and \a rhs. */
 template <typename T, bool LOpen, bool ROpen>
 basic_interval<T, LOpen, ROpen> hull(basic_interval<T, LOpen, ROpen> const& lhs,
-									 basic_interval<T, LOpen, ROpen> const& rhs) noexcept {
+                                     basic_interval<T, LOpen, ROpen> const& rhs)
+  noexcept(is_nothrow_totally_ordered<T>::value) {
 	return {std::min(lhs.lower(), rhs.lower()), std::max(lhs.upper(), rhs.upper())};
 }
 
+/** Returns true if \a is a subset of \a b. */
 template <typename T>
-bool subset(interval<T> const& a, interval<T> const& b) noexcept {
+bool subset(interval<T> const& a, interval<T> const& b)
+  noexcept(is_nothrow_totally_ordered<T>::value) {
 	auto const lower_strict_comp = a.left_open() || !b.left_open();
 	auto const upper_strict_comp = a.right_open() || !b.right_open();
 
-	return empty(a) ||
-		   ((lower_strict_comp ? b.lower() <= a.lower()
-							   : b.lower() < a.lower()) &&
-		   (upper_strict_comp ? a.upper() <= b.upper()
-							  : a.upper() < b.upper()));
+	return (lower_strict_comp ? b.lower() <= a.lower()
+	                          : b.lower() < a.lower()) &&
+	       (upper_strict_comp ? a.upper() <= b.upper()
+	                          : a.upper() < b.upper());
 }
 
+/** Returns true if \a is a subset of \a b. */
 template <typename T, bool LOpen1, bool ROpen1, bool LOpen2, bool ROpen2>
 bool subset(basic_interval<T, LOpen1, ROpen1> const& a,
-			basic_interval<T, LOpen2, ROpen2> const& b) noexcept {
+            basic_interval<T, LOpen2, ROpen2> const& b)
+  noexcept(is_nothrow_totally_ordered<T>::value) {
 	return subset(interval<T>{a}, interval<T>{b});
 }
 
+/** Returns true if \a is a superset of \a b. */
 template <typename T>
-bool superset(interval<T> const& a, interval<T> const& b) noexcept {
+bool superset(interval<T> const& a, interval<T> const& b)
+  noexcept(is_nothrow_totally_ordered<T>::value) {
 	return subset(b, a);
 }
 
+/** Returns true if \a is a superset of \a b. */
 template <typename T, bool LOpen1, bool ROpen1, bool LOpen2, bool ROpen2>
 bool superset(basic_interval<T, LOpen1, ROpen1> const& a,
-			  basic_interval<T, LOpen2, ROpen2> const& b) noexcept {
+              basic_interval<T, LOpen2, ROpen2> const& b)
+  noexcept(is_nothrow_totally_ordered<T>::value) {
 	return superset(interval<T>{a}, interval<T>{b});
 }
 
+/** Returns true if \a is a proper subset (\a is a subset but not equal to \a b) of \a b. */
 template <typename T>
-bool proper_subset(interval<T> const& a, interval<T> const& b) noexcept {
+bool proper_subset(interval<T> const& a, interval<T> const& b)
+  noexcept(is_nothrow_totally_ordered<T>::value) {
 	auto const lower_strict_comp = a.left_open() && !b.left_open();
 	auto const upper_strict_comp = a.right_open() && !b.right_open();
 
-	return (empty(a) && !empty(b)) ||
-		   ((lower_strict_comp ? b.lower() <= a.lower()
-							   : b.lower() < a.lower()) &&
-		   (upper_strict_comp ? a.upper() <= b.upper()
-							  : a.upper() < b.upper()));
+	return (lower_strict_comp ? b.lower() <= a.lower()
+	                          : b.lower() < a.lower()) &&
+	       (upper_strict_comp ? a.upper() <= b.upper()
+	                          : a.upper() < b.upper());
 }
 
+/** Returns true if \a is a proper subset (\a is a subset but not equal to \a b) of \a b. */
 template <typename T, bool LOpen1, bool ROpen1, bool LOpen2, bool ROpen2>
 bool proper_subset(basic_interval<T, LOpen1, ROpen1> const& a,
-				   basic_interval<T, LOpen2, ROpen2> const& b) noexcept {
+                   basic_interval<T, LOpen2, ROpen2> const& b)
+  noexcept(is_nothrow_totally_ordered<T>::value) {
 	return proper_subset(interval<T>{a}, interval<T>{b});
 }
 
+/** Returns true if \a is a proper superset (\a is a superset but not equal to \a b) of \a b. */
 template <typename T>
-bool proper_superset(interval<T> const& a, interval<T> const& b) noexcept {
+bool proper_superset(interval<T> const& a, interval<T> const& b)
+  noexcept(is_nothrow_totally_ordered<T>::value) {
 	return proper_subset(b, a);
 }
 
+/** Returns true if \a is a proper superset (\a is a superset but not equal to \a b) of \a b. */
 template <typename T, bool LOpen1, bool ROpen1, bool LOpen2, bool ROpen2>
 bool proper_superset(basic_interval<T, LOpen1, ROpen1> const& a,
-					 basic_interval<T, LOpen2, ROpen2> const& b) noexcept {
+                     basic_interval<T, LOpen2, ROpen2> const& b)
+  noexcept(is_nothrow_totally_ordered<T>::value) {
 	return proper_superset(interval<T>{a}, interval<T>{b});
 }
 
+/** Returns the interval that would be the codomain of applying an increasing function \a f to
+ *  the interval \a r.
+ *
+ *  As \a f is not strictly increasing, this must return a closed function. */
 template <typename Interval, typename MonotonicFunction>
 closed_interval<typename Interval::type> apply_increasing(Interval const& r, MonotonicFunction f) {
 	return {f(r.lower()), f(r.upper())};
 }
 
+/** Returns the interval that would be the codomain of applying a strictly increasing function \a f
+ *  to the interval \a r. */
 template <typename Interval, typename MonotonicFunction>
 Interval apply_strictly_increasing(Interval const& r, MonotonicFunction f) {
 	return {f(r.lower()), f(r.upper())};
 }
 
+/** Returns the interval that would be the codomain of applying an decreasing function \a f to
+ *  the interval \a r.
+ *
+ *  As \a f is not strictly decreasing, this must return a closed function. */
 template <typename Interval, typename MonotonicFunction>
 closed_interval<typename Interval::type> apply_decreasing(Interval const& r, MonotonicFunction f) {
 	return {f(r.upper()), f(r.lower())};
 }
 
+/** Returns the interval that would be the codomain of applying a strictly decreasing function \a f
+ *  to the interval \a r. */
 template <typename Interval, typename MonotonicFunction>
 Interval apply_strictly_decreasing(Interval const& r, MonotonicFunction f) {
 	return {f(r.upper()), f(r.lower())};
 }
 
-/** An intermediate class used to generate a basic_interval. */
-template <typename L, bool LOpen>
-class lower_bound {
-public:
-	lower_bound(L const& lower) noexcept(std::is_nothrow_copy_constructible<L>::value)
-	: m_lower{lower} {
-	}
-
-	basic_interval<L, LOpen, true> operator()(L const& upper) const
-	  noexcept(std::is_nothrow_copy_constructible<L>::value) {
-		return {m_lower, upper};
-	}
-
-	basic_interval<L, LOpen, false> operator[](L const& upper) const
-	  noexcept(std::is_nothrow_copy_constructible<L>::value) {
-		return {m_lower, upper};
-	}
-
-private:
-	L m_lower;
-};
-
-/** Used to create an object of lower_bound which is then used to create the basic_interval
-	object. */
-class interval_factory {
-public:
-	template <typename L>
-	lower_bound<L, true> operator()(L const& lower) const
-	  noexcept(std::is_nothrow_copy_constructible<L>::value) {
-		return {lower};
-	}
-
-	template <typename L>
-	lower_bound<L, false> operator[](L const& lower) const
-	  noexcept(std::is_nothrow_copy_constructible<L>::value) {
-		return {lower};
-	}
-};
-
 /** This variable is used to create intervals by calling the index array operator and function
-	operator. */
-static interval_factory const make_interval;
+ *  operator.
+
+ *  \code
+ *  auto a = ez::make_interval[0][1];  // Returns ez::closed_interval<int>
+ *  auto b = ez::make_interval[2](3);  // Returns ez::right_open<int>
+ *  auto c = ez::make_interval(4)[8];  // Returns ez::left_open<int>
+ *  auto d = ez::make_interval(-1)(1); // Returns ez::open_interval<int>
+ *  \endcode */
+static detail::interval_factory const make_interval;
 
 }
 

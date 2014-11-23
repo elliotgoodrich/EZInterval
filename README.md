@@ -19,7 +19,7 @@ The way this is achieved is through a class called `ez::direct_iterator<T>`. It 
               ez::make_direct_iterator(10),
               std::ostream_iterator<int>(std::cout, " "));
 
-`ez::direct_iterator<T>` can be considered the opposite to `boost::indirect_iterator<T>`, to the point that `boost::indirect_iterator<ez::direct_iterator<T>>` should be functionally identical to `T` when `T` is itself an iterator. A good example of the duality of these classes can be seen in the [copy_selected](examples/sort_selected.cpp) algorithm shown in the examples.
+`ez::direct_iterator<T>` can be considered the opposite to `boost::indirect_iterator<T>`, to the point that `boost::indirect_iterator<ez::direct_iterator<T>>` should be functionally identical to `T` when `T` is itself an iterator. A good example of the duality of these classes can be seen in the [sort_selected](examples/sort_selected.cpp) algorithm shown in the examples.
 
 `ez::direct_interval` will figure out what operations the underlying type `T` supports, and will set it's `iterator_category` appropriately. This means that if we have `ez::direct_interval<typedef std::list<int>::iterator>`, then it will have an `iterator_category` of `std::bidirectional_iterator`.
 

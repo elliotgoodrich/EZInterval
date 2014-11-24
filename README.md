@@ -1,7 +1,7 @@
 EZInterval
 ==========
 
-A header-only library to help iterating through numeric types.
+A C++11 header-only library to help iterating through numeric types.
 
 As range-for loops and algorithms become more prevalent in modern C++ code, it's become more obvious that there is a gap in functionality with iterating through fundamental types such as `int`, `char` and pointers. EZInterval allows iterating through types which have most of the properties of iterators (incrementing, decrementing, copy construction, equality comparison), but don't provide a dereference operator or `operator->()`.
 

@@ -11,7 +11,7 @@ int main() {
 	seq.push_back(1);
 
 	std::cout << "The first " << limit << " values of Conway's Look-And-Say sequence\n";
-	for(auto x : ez::make_interval[1][limit]) {
+	for(auto&& x : ez::make_interval[1][limit]) {
 		std::cout << x << ": ";
 		std::copy(std::begin(seq), std::end(seq), std::ostream_iterator<int>(std::cout));
 		std::cout << '\n';

@@ -104,8 +104,8 @@ auto input_compatible(int) ->
 		is_defined<decltype(++(std::declval<T&>()))>(),                   // Pre-incrementable
 	// InputIterator Concepts
 		is_defined<decltype(std::declval<T&>() == std::declval<T&>())>(), // Equality
-		is_defined<decltype(std::declval<T&>() != std::declval<T&>())>(), // Inequality
-		is_defined<decltype(std::declval<T&>()++)>()                      // Post-incrementable
+		is_defined<decltype(std::declval<T&>() != std::declval<T&>())>()  // Inequality
+		// Post-increment is implemented in terms of pre-increment
 	);
 
 template <typename T>
@@ -132,8 +132,8 @@ auto bidirectional_compatible(int) ->
 	// ForwardIterator Concepts
 		typename is_true<decltype(forward_compatible<T>(0))::value>::type(),
 	// BidirectionalIterator Concepts
-		is_defined<decltype(--std::declval<T&>())>(), // Pre-decrementable
-		is_defined<decltype(std::declval<T&>()--)>()  // Post-decrementable
+		is_defined<decltype(--std::declval<T&>())>() // Pre-decrementable
+		// Post-decrement is implemented in terms of pre-decrement
 	);
 
 template <typename T>

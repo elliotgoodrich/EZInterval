@@ -23,6 +23,10 @@ The way this is achieved is through a class called `ez::direct_iterator<T>`. It 
 
 `ez::direct_interval` will figure out what operations the underlying type `T` supports, and will set it's `iterator_category` appropriately. This means that if we have `ez::direct_interval<typedef std::list<int>::iterator>`, then it will have an `iterator_category` of `std::bidirectional_iterator`.
 
+ez::direct_iterator vs boost::counting_iterator
+-----------------------------------------------
+These classes are all most identical. The main differences are that `boost::counting_iterator` works in C++98 whereas `ez::direct_iterator` is C++11 only. However, `boost::counting_iterator` requires you to specialise a template to work on custom types that aren't an iterator or have `std::numeric_limits` specialised. `ez::direct_iterator` figures out the correct iterator tag to use based on what operations that type supports and requires no additional work.
+
 ez::interval<T> and ez::basic_interval<T, bool, bool>
 -----------------------------------------------------
 The other classes in EZInterval are `ez::basic_interval<T, bool, bool>` and `ez::interval<T>` which represent interval (where whether the interval is left open and right open is statically determined in `ez::basic_interval` and determined at run-time in `ez::interval`). basic_interval can be constructed using the variable `ez::make_interval`.

@@ -29,7 +29,7 @@ These classes are almost identical. The main differences are that `boost::counti
 
 ez::interval<T> and ez::basic_interval<T, bool, bool>
 -----------------------------------------------------
-The other classes in EZInterval are `ez::basic_interval<T, bool, bool>` and `ez::interval<T>` which represent interval (where whether the interval is left open and right open is statically determined in `ez::basic_interval` and determined at run-time in `ez::interval`). basic_interval can be constructed using the variable `ez::make_interval`.
+The other classes in EZInterval are `ez::basic_interval<T, bool, bool>` and `ez::interval<T>` which represent intervals (where whether the interval is left open and right open is statically determined in `ez::basic_interval` and determined at run-time in `ez::interval`). `ez::basic_interval` can be constructed using the variable `ez::make_interval`.
 
 Intervals can be left-open, right-open, neither, or both. A usual syntax is [a, b] for closed intervals, [a, b) for right-open intervals, (a, b] for left-open intervals, and (a, b) for open intervals. Overloading the functor operator and array index operator, we can mimic this notation (there are 4 template aliases to `ez::basic_interval` for readability, which we use below).
 

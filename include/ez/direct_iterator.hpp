@@ -308,7 +308,7 @@ public:
 	}
 
 	direct_iterator<T> operator[](difference_type n) const {
-		return direct_iterator<T>{m_value + n};
+		return direct_iterator<T>{static_cast<T>(m_value + n)};
 	}
 
 private:

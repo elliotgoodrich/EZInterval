@@ -77,16 +77,21 @@ T next_if_true(T value, bool b) {
 
 template <typename L, bool LOpen>
 class lower_bound {
+	template <typename U>
+	using common = typename std::common_type<L, U>::type;
+
 public:
 	lower_bound(L const& lower) noexcept(std::is_nothrow_copy_constructible<L>::value)
 	: m_lower{lower} {
 	}
 
-	basic_interval<L, LOpen, true> operator()(L const& upper) const {
+	template <typename U>
+	basic_interval<common<U>, LOpen, true> operator()(U const& upper) const {
 		return {m_lower, upper};
 	}
 
-	basic_interval<L, LOpen, false> operator[](L const& upper) const {
+	template <typename U>
+	basic_interval<common<U>, LOpen, false> operator[](U const& upper) const {
 		return {m_lower, upper};
 	}
 

@@ -2,6 +2,9 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <iostream>
+#include <typeinfo>
+
 BOOST_AUTO_TEST_SUITE(basic_interval)
 
 BOOST_AUTO_TEST_CASE(Constructor) {
@@ -42,6 +45,13 @@ BOOST_AUTO_TEST_CASE(Constructor) {
 	BOOST_CHECK_THROW(ez::interval<int>(0, 0, ez::left_open),  ez::empty_interval);
 	BOOST_CHECK_THROW(ez::interval<int>(0, 0, ez::open),       ez::empty_interval);
 	BOOST_CHECK_THROW(ez::interval<int>(1, 0, ez::closed),     ez::empty_interval);
+
+	// Check the type when using different types for upper and lower bounds
+	static_assert(std::is_same<decltype(*ez::make_interval[0u](std::size_t{1}).begin()),
+	                           std::size_t const&>::value, "");
+
+	static_assert(std::is_same<decltype(*ez::make_interval[0.0f](1.0).begin()),
+	                           double const&>::value, "");
 }
 
 BOOST_AUTO_TEST_CASE(BeginEndTest) {

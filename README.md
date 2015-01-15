@@ -25,7 +25,7 @@ The way this is achieved is through a class called `ez::direct_iterator<T>`. It 
 
 ez::direct_iterator vs boost::counting_iterator
 -----------------------------------------------
-These classes are all most identical. The main differences are that `boost::counting_iterator` works in C++98 whereas `ez::direct_iterator` is C++11 only. However, `boost::counting_iterator` requires you to specialise a template to work on custom types that aren't an iterator or have `std::numeric_limits` specialised. `ez::direct_iterator` figures out the correct iterator tag to use based on what operations that type supports and requires no additional work.
+These classes are almost identical. The main differences are that `boost::counting_iterator` works in C++98 whereas `ez::direct_iterator` is C++11 only. However, `boost::counting_iterator` requires you to specialise a template to work on custom types that aren't iterators or have `std::numeric_limits` specialised. `ez::direct_iterator` figures out the correct iterator tag to use based on what operations that type supports and requires no additional work.
 
 ez::interval<T> and ez::basic_interval<T, bool, bool>
 -----------------------------------------------------

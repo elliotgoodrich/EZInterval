@@ -1,9 +1,9 @@
 #include "ez/interval.hpp"
+#include "ostream.hpp"
 
 #include <boost/test/unit_test.hpp>
 
 #include <iostream>
-#include <typeinfo>
 
 BOOST_AUTO_TEST_SUITE(basic_interval)
 
@@ -78,6 +78,63 @@ BOOST_AUTO_TEST_CASE(EqualityTest) {
 	BOOST_CHECK(ez::make_interval[0](1) != ez::make_interval(0)[1]);
 	BOOST_CHECK(ez::make_interval[0](1) != ez::make_interval(0)(1));
 	BOOST_CHECK(ez::make_interval(0)[1] != ez::make_interval(0)(1));
+}
+
+BOOST_AUTO_TEST_CASE(iterate) {
+	{
+		std::vector<int> vec = {-1, -2, -3, -4, -5};
+		BOOST_CHECK_EQUAL(ez::make_interval[vec.begin()](vec.end()), ez::iterate(vec));
+
+		auto const i = ez::iterate(vec);
+		auto start = *i.begin();
+		static_assert(std::is_same<std::vector<int>::iterator, decltype(start)>::value, "");
+		auto end = *i.end();
+		static_assert(std::is_same<std::vector<int>::iterator, decltype(end)>::value, "");
+	}
+
+	{
+		std::list<int> list = {6, 2, 3};
+
+		// std::list does not give us a random access iterator, so we can't call make_interval
+		// since it requires operator<
+		auto const i = ez::iterate(list);
+		BOOST_CHECK_EQUAL(ez::make_direct_iterator(list.begin()), i.begin());
+		BOOST_CHECK_EQUAL(ez::make_direct_iterator(list.end()), i.end());
+
+		auto const& clist = list;
+		auto const j = ez::iterate(clist);
+		BOOST_CHECK_EQUAL(ez::make_direct_iterator(list.cbegin()), j.begin());
+		BOOST_CHECK_EQUAL(ez::make_direct_iterator(list.cend()), j.end());
+
+		auto start = *i.begin();
+		static_assert(std::is_same<std::list<int>::iterator, decltype(start)>::value, "");
+		auto end = *i.end();
+		static_assert(std::is_same<std::list<int>::iterator, decltype(end)>::value, "");
+	}
+}
+
+BOOST_AUTO_TEST_CASE(indices) {
+	{
+		std::vector<int> vec = {5, 6, 7, 8};
+		BOOST_CHECK_EQUAL(ez::make_interval[0u](vec.size()), ez::indices(vec));
+
+		auto const i = ez::indices(vec);
+		auto start = *i.begin();
+		static_assert(std::is_same<std::vector<int>::size_type, decltype(start)>::value, "");
+		auto end = *i.end();
+		static_assert(std::is_same<std::vector<int>::size_type, decltype(end)>::value, "");
+	}
+
+	{
+		std::list<int> list = {1, 2, 3};
+		BOOST_CHECK_EQUAL(ez::make_interval[0u](list.size()), ez::indices(list));
+
+		auto const i = ez::indices(list);
+		auto start = *i.begin();
+		static_assert(std::is_same<std::list<int>::size_type, decltype(start)>::value, "");
+		auto end = *i.end();
+		static_assert(std::is_same<std::list<int>::size_type, decltype(end)>::value, "");
+	}
 }
 
 BOOST_AUTO_TEST_CASE(Singleton) {

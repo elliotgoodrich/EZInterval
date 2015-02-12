@@ -10,6 +10,7 @@ include_directories(../include/)
 include_directories(${Boost_INCLUDE_DIRS})
 
 set(SOURCES
+	ostream.hpp
 	basic_interval.cpp
 	interval.cpp
 	direct_iterator.cpp

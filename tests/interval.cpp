@@ -1,4 +1,5 @@
 #include "ez/interval.hpp"
+#include "ostream.hpp"
 
 #include <boost/test/unit_test.hpp>
 

@@ -131,6 +131,10 @@ struct divide_by_zero : std::runtime_error {
 };
 
 template <typename T>
+struct is_interval : std::false_type {
+};
+
+template <typename T>
 struct is_nothrow_totally_ordered {
 	static bool const value =
 	  noexcept(std::declval<T&>() < std::declval<T&>()) &&
@@ -140,6 +144,16 @@ struct is_nothrow_totally_ordered {
 	  noexcept(std::declval<T&>() == std::declval<T&>()) &&
 	  noexcept(std::declval<T&>() != std::declval<T&>());
 };
+
+/* These must be forward declared since they need to access a private constuctor of basic_interval
+   in order to bypass it's check that the interval is valid. This check uses operator< which isn't
+   defined for iterators that aren't random access iterators, though we know that the interval is
+   valid if we create it directly from a container. */
+template <typename Container>
+basic_interval<typename Container::iterator, false, true> iterate(Container&);
+
+template <typename Container>
+basic_interval<typename Container::const_iterator, false, true> iterate(const Container&);
 
 /** A class to represent a mathematical interval of type T where the openness can be changed at
  *  run-time. */
@@ -156,6 +170,12 @@ public:
 			throw empty_interval{};
 		}
 	}
+
+	basic_interval(const basic_interval<T, LOpen, ROpen>&) = default;
+	basic_interval(basic_interval<T, LOpen, ROpen>&&) = default;
+
+	basic_interval<T, LOpen, ROpen>& operator=(const basic_interval<T, LOpen, ROpen>&) = default;
+	basic_interval<T, LOpen, ROpen>& operator=(basic_interval<T, LOpen, ROpen>&&) = default;
 
 	T const& lower() const noexcept {
 		return m_lower;
@@ -207,8 +227,32 @@ public:
 	}
 
 private:
+	template <typename Container>
+	friend basic_interval<typename Container::iterator, false, true> iterate(Container&);
+
+	template <typename Container>
+	friend basic_interval<typename Container::const_iterator, false, true> iterate(const Container&);
+
+	template <typename Container>
+	basic_interval(const Container& c, std::nullptr_t)
+	: m_lower{c.begin()}
+	, m_upper{c.end()} {
+		static_assert(!LOpen && ROpen, "");
+	}
+
+	template <typename Container>
+	basic_interval(Container& c, std::nullptr_t)
+	: m_lower{c.begin()}
+	, m_upper{c.end()} {
+		static_assert(!LOpen && ROpen, "");
+	}
+
 	T m_lower;
 	T m_upper;
+};
+
+template <typename T, bool LOpen, bool ROpen>
+struct is_interval<basic_interval<T, LOpen, ROpen>> : std::true_type {
 };
 
 /** Type alias for an open interval. */
@@ -226,6 +270,25 @@ using lopen_interval = basic_interval<T, true, false>;
 /** Type alias for left closed/right open interval. */
 template <typename T>
 using ropen_interval = basic_interval<T, false, true>;
+
+/***************************************************************************************************
+* Functions to help iterator over containers                                                       *
+***************************************************************************************************/
+
+template <typename Container>
+basic_interval<typename Container::iterator, false, true> iterate(Container& c) {
+	return {c, nullptr};
+}
+
+template <typename Container>
+basic_interval<typename Container::const_iterator, false, true> iterate(const Container& c) {
+	return {c, nullptr};
+}
+
+template <typename Container>
+ropen_interval<typename Container::size_type> indices(const Container& c) {
+	return {static_cast<typename Container::size_type>(0u), c.size()};
+}
 
 /***************************************************************************************************
 * Compound assignment operators for basic_interval                                                 *
@@ -511,6 +574,10 @@ private:
 	openness m_openness;
 };
 
+template <typename T>
+struct is_interval<interval<T>> : std::true_type {
+};
+
 /***************************************************************************************************
 * Compound assignment operators for interval                                                       *
 ***************************************************************************************************/
@@ -748,7 +815,9 @@ interval<T> operator/(interval<T> l, typename interval<T>::difference_type const
 * Functions which work on both interval and basic_interval                                         *
 ***************************************************************************************************/
 
-template <typename Interval1, typename Interval2>
+template <typename Interval1, typename Interval2,
+          typename std::enable_if<is_interval<Interval1>::value &&
+                                  is_interval<Interval2>::value>::type* = nullptr>
 bool operator==(Interval1 const& lhs, Interval2 const& rhs)
   noexcept(is_nothrow_totally_ordered<typename Interval1::type>::value) {
 	static_assert(std::is_same<typename Interval1::type, typename Interval2::type>::value,
@@ -759,14 +828,17 @@ bool operator==(Interval1 const& lhs, Interval2 const& rhs)
 	    && lhs.upper()      == rhs.upper();
 }
 
-template <typename Interval1, typename Interval2>
+template <typename Interval1, typename Interval2,
+          typename std::enable_if<is_interval<Interval1>::value &&
+                                  is_interval<Interval2>::value>::type* = nullptr>
 bool operator!=(Interval1 const& lhs, Interval2 const& rhs)
   noexcept(is_nothrow_totally_ordered<typename Interval1::type>::value) {
 	return !(lhs == rhs);
 }
 
 /** Returns true if \a r contains only one element. */
-template <typename Interval>
+template <typename Interval,
+          typename std::enable_if<is_interval<Interval>::value>::type* = nullptr>
 bool singleton(Interval const& r)
   noexcept(is_nothrow_totally_ordered<typename Interval::type>::value) {
 	return r.left_closed() && r.right_closed() && (r.lower() == r.upper());
@@ -785,7 +857,8 @@ basic_interval<To, LOpen, ROpen> interval_cast(basic_interval<From, LOpen, ROpen
 }
 
 /** Returns the difference between the upper and lower bounds of \a r. */
-template <typename Interval, typename U = typename Interval::type>
+template <typename Interval, typename U = typename Interval::type,
+          typename std::enable_if<is_interval<Interval>::value>::type* = nullptr>
 U diameter(Interval const& r) {
 	return static_cast<U>(r.upper()) - static_cast<U>(r.lower());
 }
@@ -802,6 +875,7 @@ U diameter(Interval const& r) {
  *  auto b = ez::midpoint<double>(r); // 0.5
  *  \endcode */
 template <typename U = void, typename Interval,
+          typename std::enable_if<is_interval<Interval>::value>::type* = nullptr,
           typename Return = typename detail::first_non_void<U, typename Interval::type>::type>
 Return midpoint(Interval const& r) {
 	return static_cast<Return>(r.lower()) +
@@ -818,13 +892,15 @@ Return midpoint(Interval const& r) {
  *  auto s = ez::radius<double>(i); // 2.5
  *  \endcode */
 template <typename U = void, typename Interval,
+          typename std::enable_if<is_interval<Interval>::value>::type* = nullptr,
           typename Return = typename detail::first_non_void<U, typename Interval::type>::type>
 Return radius(Interval const& r) {
 	return static_cast<Return>(diameter(r)) / 2;
 }
 
 /** Returns true if \a value is within the interval \a r. */
-template <typename Interval>
+template <typename Interval,
+          typename std::enable_if<is_interval<Interval>::value>::type* = nullptr>
 bool contains(Interval const& r, typename Interval::type const& value)
   noexcept(is_nothrow_totally_ordered<typename Interval::type>::value) {
 	return (r.left_open()  ? r.lower() < value : r.lower() <= value) &&
@@ -837,7 +913,8 @@ bool contains(Interval const& r, typename Interval::type const& value)
  *  auto a = ez::interval<int>(0, 1, ez::open);
  *  auto b = make_closed(a); // b is now of type ez::closed_interval<int>
  *  \endcode */
-template <typename Interval>
+template <typename Interval,
+          typename std::enable_if<is_interval<Interval>::value>::type* = nullptr>
 closed_interval<typename Interval::type> make_closed(Interval const& r) {
 	return {r.lower(), r.upper()};
 }
@@ -848,7 +925,8 @@ closed_interval<typename Interval::type> make_closed(Interval const& r) {
  *  auto a = ez::interval<int>(0, 1, ez::closed);
  *  auto b = make_open(a); // b is now of type ez::open_interval<int>
  *  \endcode */
-template <typename Interval>
+template <typename Interval,
+          typename std::enable_if<is_interval<Interval>::value>::type* = nullptr>
 open_interval<typename Interval::type> make_open(Interval const& r) {
 	return {r.lower(), r.upper()};
 }
@@ -880,7 +958,9 @@ std::ostream& operator<<(std::ostream& stream, basic_interval<T, LOpen, ROpen> c
  *  auto b = ez::make_interval(1)(6);
  *  assert(intersection(a, b) == ez::make_interval(1)[5]);
  *  \endcode */
-template <typename Interval1, typename Interval2>
+template <typename Interval1, typename Interval2,
+          typename std::enable_if<is_interval<Interval1>::value &&
+                                  is_interval<Interval2>::value>::type* = nullptr>
 interval<typename Interval1::type> intersection(Interval1 const& lhs,
                                                 Interval2 const& rhs) {
 	static_assert(std::is_same<typename Interval1::type, typename Interval2::type>::value,
@@ -916,7 +996,9 @@ basic_interval<T, LOpen, ROpen> intersection(basic_interval<T, LOpen, ROpen> con
  *  auto b = ez::make_interval(1)(8);
  *  assert(hull(a, b) == ez::make_interval(1)[9]);
  *  \endcode */
-template <typename Interval1, typename Interval2>
+template <typename Interval1, typename Interval2,
+          typename std::enable_if<is_interval<Interval1>::value &&
+                                  is_interval<Interval2>::value>::type* = nullptr>
 interval<typename Interval1::type> hull(Interval1 const& lhs, Interval2 const& rhs)
   noexcept(is_nothrow_totally_ordered<typename Interval1::type>::value) {
 	static_assert(std::is_same<typename Interval1::type, typename Interval2::type>::value,
@@ -1016,14 +1098,16 @@ bool proper_superset(basic_interval<T, LOpen1, ROpen1> const& a,
  *  the interval \a r.
  *
  *  As \a f is not strictly increasing, this must return a closed function. */
-template <typename Interval, typename MonotonicFunction>
+template <typename Interval, typename MonotonicFunction,
+          typename std::enable_if<is_interval<Interval>::value>::type* = nullptr>
 closed_interval<typename Interval::type> apply_increasing(Interval const& r, MonotonicFunction f) {
 	return {f(r.lower()), f(r.upper())};
 }
 
 /** Returns the interval that would be the codomain of applying a strictly increasing function \a f
  *  to the interval \a r. */
-template <typename Interval, typename MonotonicFunction>
+template <typename Interval, typename MonotonicFunction,
+          typename std::enable_if<is_interval<Interval>::value>::type* = nullptr>
 Interval apply_strictly_increasing(Interval const& r, MonotonicFunction f) {
 	return {f(r.lower()), f(r.upper())};
 }
@@ -1032,14 +1116,16 @@ Interval apply_strictly_increasing(Interval const& r, MonotonicFunction f) {
  *  the interval \a r.
  *
  *  As \a f is not strictly decreasing, this must return a closed function. */
-template <typename Interval, typename MonotonicFunction>
+template <typename Interval, typename MonotonicFunction,
+          typename std::enable_if<is_interval<Interval>::value>::type* = nullptr>
 closed_interval<typename Interval::type> apply_decreasing(Interval const& r, MonotonicFunction f) {
 	return {f(r.upper()), f(r.lower())};
 }
 
 /** Returns the interval that would be the codomain of applying a strictly decreasing function \a f
  *  to the interval \a r. */
-template <typename Interval, typename MonotonicFunction>
+template <typename Interval, typename MonotonicFunction,
+          typename std::enable_if<is_interval<Interval>::value>::type* = nullptr>
 Interval apply_strictly_decreasing(Interval const& r, MonotonicFunction f) {
 	return {f(r.upper()), f(r.lower())};
 }

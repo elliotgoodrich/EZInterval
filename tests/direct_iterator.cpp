@@ -1,4 +1,5 @@
 #include "ez/direct_iterator.hpp"
+#include "ostream.hpp"
 
 #include <boost/test/unit_test.hpp>
 
@@ -15,26 +16,6 @@ using direct_category = typename ez::direct_iterator<T>::iterator_category;
 template <typename T>
 using difference_type = typename ez::direct_iterator<T>::difference_type;
 
-namespace std {
-
-std::ostream& operator<<(std::ostream& stream, std::vector<int>::iterator it) {
-	return stream << reinterpret_cast<intptr_t>(&*it);
-}
-
-std::ostream& operator<<(std::ostream& stream, std::list<int>::iterator it) {
-	return stream << reinterpret_cast<intptr_t>(&*it);
-}
-
-std::ostream& operator<<(std::ostream& stream, std::forward_list<int>::iterator it) {
-	return stream << reinterpret_cast<intptr_t>(&*it);
-}
-
-template <typename T>
-std::ostream& operator<<(std::ostream& stream, ez::direct_iterator<T> it) {
-	return stream << *it;
-}
-
-}
 
 BOOST_AUTO_TEST_SUITE(direct_iterator)
 

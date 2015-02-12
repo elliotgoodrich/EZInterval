@@ -5,9 +5,29 @@ A C++11 header-only library to help iterating through numeric types.
 
 As range-for loops and algorithms become more prevalent in modern C++ code, it's become more obvious that there is a gap in functionality with iterating through fundamental types such as `int`, `char` and pointers. EZInterval allows iterating through types which have most of the properties of iterators (incrementing, decrementing, copy construction, equality comparison), but don't provide a dereference operator or `operator->()`.
 
+There are two helper functions that help iterate through a container when you either need an iterator (`ez::iterate`) or an index (`ez::indices`) but want to use a range-based for loop.
+
+```cpp
+// Iterate through digits of pi using an iterator
+std::cout << "pi:  3.";
+auto pi = std::vector<int>{1, 4, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9};
+for(auto it : ez::iterate(pi)) {
+	std::cout << *it;
+}
+std::cout << std::endl;
+
+// Iterate through digits of e using the index
+std::cout << "e:   2.";
+auto e = std::vector<int>{7, 1, 8, 2, 8, 1, 8, 2, 8, 4, 5, 9, 0};
+for(auto index : ez::indices(e)) {
+	std::cout << e[index];
+}
+std::cout << std::endl;
+```
+
 ez::direct_iterator
 --------------------
-The way this is achieved is through a class called `ez::direct_iterator<T>`. It takes an object of type `T` and forwards all operators to this object, but when dereferenced, returns a const-reference to this object, rather than dereferencing it. This allows iterators over the built-in numeric types, pointers and other similar types.
+A more fine-grained control for iteration is achieved is through a class called `ez::direct_iterator<T>`. It takes an object of type `T` and forwards all operators to this object, but when dereferenced, returns a const-reference to this object, rather than dereferencing it. This allows iterators over the built-in numeric types, pointers and other similar types.
 
 ```cpp
 ez::direct_iterator<int> it = 3;
